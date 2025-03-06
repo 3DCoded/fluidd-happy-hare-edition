@@ -5,6 +5,10 @@ on:
     - cron: "*/5 * * * *" # Every 5 minutes
   workflow_dispatch:
 
+permissions:
+  contents: write  # Allow the action to update repository contents
+  workflows: none
+
 jobs:
   sync:
     runs-on: ubuntu-latest
