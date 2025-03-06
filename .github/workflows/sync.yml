@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: write  # Allow the action to update repository contents
-  workflows: none
 
 jobs:
   sync:
