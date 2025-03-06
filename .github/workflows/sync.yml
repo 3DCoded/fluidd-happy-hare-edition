@@ -25,9 +25,12 @@ jobs:
       - name: Sync with upstream
         run: |
           git checkout develop # Replace with your branch
-          git merge upstream/develop --allow-unrelated-histories
-        continue-on-error: true  # Ignore errors (such as merge conflicts) during the merge process
-
+          git merge upstream/develop --allow-unrelated-histories || true  # Continue even if merge fails
+          # Resolve conflicts by keeping current branch (our version)
+          git checkout --theirs .github/
+          git add .github/
+          git commit -m "Merge with upstream, resolved conflicts in .github/"
+          
       - name: Push changes
         run: |
           git push origin develop
