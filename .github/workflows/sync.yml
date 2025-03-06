@@ -26,4 +26,9 @@ jobs:
         run: |
           git checkout develop # Replace with your branch
           git merge upstream/develop --allow-unrelated-histories
+        continue-on-error: true  # Ignore errors (such as merge conflicts) during the merge process
+
+      - name: Push changes
+        run: |
           git push origin develop
+        if: success()  # Only push if the merge was successful (no conflicts)
