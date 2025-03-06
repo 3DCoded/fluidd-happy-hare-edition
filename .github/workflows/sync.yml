@@ -30,7 +30,11 @@ jobs:
           git checkout --theirs .github/
           git add .github/
           git commit -m "Merge with upstream, resolved conflicts in .github/"
-          
+
+      - name: Remove workflow files from changes
+        run: |
+          git reset HEAD .github/workflows/
+        
       - name: Push changes
         run: |
           git push origin develop
