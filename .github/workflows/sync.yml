@@ -1,44 +1,44 @@
-name: Sync with Upstream
+# name: Sync with Upstream
 
-on:
-  schedule:
-    - cron: "*/5 * * * *" # Every 5 minutes
-  workflow_dispatch:
+# on:
+#   schedule:
+#     - cron: "*/5 * * * *" # Every 5 minutes
+#   workflow_dispatch:
 
-permissions:
-  contents: write  # Allow the action to update repository contents
+# permissions:
+#   contents: write  # Allow the action to update repository contents
 
-jobs:
-  sync:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout this repo
-        uses: actions/checkout@v3
+# jobs:
+#   sync:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout this repo
+#         uses: actions/checkout@v3
 
-      - name: Set up Git
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+#       - name: Set up Git
+#         run: |
+#           git config --global user.name "github-actions[bot]"
+#           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Add upstream repository
-        run: |
-          git remote add upstream https://github.com/moggieuk/fluidd-happy-hare-edition
-          git fetch upstream
+#       - name: Add upstream repository
+#         run: |
+#           git remote add upstream https://github.com/moggieuk/fluidd-happy-hare-edition
+#           git fetch upstream
 
-      - name: Sync with upstream
-        run: |
-          git checkout develop # Replace with your branch
-          git merge upstream/develop --allow-unrelated-histories || true  # Continue even if merge fails
-          # Resolve conflicts by keeping current branch (our version)
-          git checkout --theirs .github/
-          git add .github/
-          git commit -m "Merge with upstream, resolved conflicts in .github/"
+#       - name: Sync with upstream
+#         run: |
+#           git checkout develop # Replace with your branch
+#           git merge upstream/develop --allow-unrelated-histories || true  # Continue even if merge fails
+#           # Resolve conflicts by keeping current branch (our version)
+#           git checkout --theirs .github/
+#           git add .github/
+#           git commit -m "Merge with upstream, resolved conflicts in .github/"
 
-      - name: Remove workflow files from changes
-        run: |
-          git reset HEAD .github/workflows/
+#       - name: Remove workflow files from changes
+#         run: |
+#           git reset HEAD .github/workflows/
         
-      - name: Push changes
-        run: |
-          git push origin develop
-        if: success()  # Only push if the merge was successful (no conflicts)
+#       - name: Push changes
+#         run: |
+#           git push origin develop
+#         if: success()  # Only push if the merge was successful (no conflicts)
