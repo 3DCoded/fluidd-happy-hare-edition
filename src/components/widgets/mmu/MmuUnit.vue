@@ -8,7 +8,10 @@
         @contextmenu.prevent="openContextMenu(g, $event)"
         @click="selectGate(g)"
       >
-        <div :class="clipSpoolClass">
+        <div
+          class="clip-spool"
+          :style="{ 'max-height': `${clipHeight}px` }"
+        >
           <v-menu
             v-model="gateMenuVisible[g]"
             :disabled="g === gate"
@@ -135,13 +138,17 @@
           :edit-gate-selected="editGateSelected"
         />
       </div>
+
       <div
         v-if="showBypass"
         class="gate"
         @contextmenu.prevent="openContextMenu(-2, $event)"
         @click="selectBypass()"
       >
-        <div :class="clipSpoolClass">
+        <div
+          class="clip-spool"
+          :style="{ 'max-height': `${clipHeight}px` }"
+        >
           <mmu-spool
             :width="$filters.getPixelsString(spoolWidth)"
             :class="spoolClass(TOOL_GATE_BYPASS)"
@@ -205,52 +212,29 @@
       </div>
     </div>
 
-    <div
-      class="logo-row"
-      :style="{
-        'max-width': `${logoRowWidth}px`
-      }"
-    >
-      <div
-        v-if="showLogos && vendorLogo"
-        class="mmu-logo"
-        :style="{
-          height: `${logoHeight}px`
-        }"
-      >
-        <inline-svg
-          :src="vendorLogoUrl"
-          height="100%"
-          @error="vendorLogo = 'HappyHare'"
-        />
-      </div>
-      <div class="unit-info">
-        <div class="unit-name">
-          <span v-if="showName">{{ unitDisplayName }}</span>
-        </div>
-        <div
-          v-if="unitClimateInfo"
-          class="unit-climate"
-        >
-          {{ unitClimateInfo }}
-        </div>
-      </div>
-    </div>
+    <mmu-unit-footer
+      class="pt-0 position-relative"
+      :style="footerStyle"
+      :mmu-machine-unit="mmuMachineUnit"
+      :show-details="showDetails"
+      :show-footer="showFooter"
+      :unit-index="unitIndex"
+    />
   </v-container>
 </template>
 
 <script lang="ts">
-import { Component, Mixins, Prop, Watch } from 'vue-property-decorator'
+import { Component, Mixins, Prop } from 'vue-property-decorator'
 import BrowserMixin from '@/mixins/browser'
 import StateMixin from '@/mixins/state'
 import MmuMixin from '@/mixins/mmu'
 import type { MmuGateDetails } from '@/types'
-import type { Sensor } from '@/store/printer/types'
 import MmuSpool from '@/components/widgets/mmu/MmuSpool.vue'
 import MmuGateStatus from '@/components/widgets/mmu/MmuGateStatus.vue'
+import MmuUnitFooter from '@/components/widgets/mmu/MmuUnitFooter.vue'
 
 @Component({
-  components: { MmuSpool, MmuGateStatus },
+  components: { MmuSpool, MmuGateStatus, MmuUnitFooter },
 })
 export default class MmuUnit extends Mixins(BrowserMixin, StateMixin, MmuMixin) {
   @Prop({ required: false, default: 0 })
@@ -265,98 +249,40 @@ export default class MmuUnit extends Mixins(BrowserMixin, StateMixin, MmuMixin) 
   @Prop({ required: false, default: true })
   readonly showContextMenu!: boolean
 
+  @Prop({ required: false, default: true })
+  readonly showDetails!: boolean
+
+  @Prop({ required: false, default: true })
+  readonly showFooter!: boolean
+
+  @Prop({ required: false, default: false })
+  readonly hideBypass!: boolean
+
   gateMenuVisible: Record<number, boolean> = {}
 
-  vendorLogo = ''
   closeTimeout: number | null = null
   menuX = 0
   menuY = 0
 
-  @Watch('unit', { immediate: true })
-  onUnit (value: number) {
-    this.vendorLogo = this.unitDetails(value).vendor
-  }
-
-  get vendorLogoUrl (): string | null {
-    return `${import.meta.env.BASE_URL}img/mmu/mmu_${this.vendorLogo}.svg`
-  }
-
-  get unitDisplayName (): string {
-    const name = this.unitDetails(this.unitIndex).name
-    return `#${this.unitIndex + 1} ${name}`
-  }
-
-  get printerSensors (): Sensor[] {
-    return this.$typedGetters['printer/getSensors']
-  }
-
-  get unitClimateInfo (): string {
-    const unit = this.unitDetails(this.unitIndex)
-
-    // Handle missing or quoted sensor name
-    const sensorName = unit.environmentSensor?.replace(/^"(.*)"$/, '$1')
-    if (!sensorName) return ''
-
-    const sensor = this.printerSensors.find(s => s.key === sensorName)
-    if (!sensor) return ''
-
-    const parts: string[] = []
-
-    if (sensor.temperature != null) {
-      parts.push(`${sensor.temperature.toFixed(0)}°C`)
-    }
-
-    if (sensor.humidity != null) {
-      parts.push(`${sensor.humidity.toFixed(0)}%`)
-    }
-
-    return parts.join(' / ')
+  get mmuMachineUnit () {
+    return this.unitDetails(this.unitIndex)
   }
 
   get unitGateRange (): number[] {
-    const unitDetails = this.unitDetails(this.unitIndex)
-    return Array.from({ length: unitDetails.numGates }, (v, k) => k + unitDetails.firstGate)
+    if (this.unitIndex < 0) return []
+    return Array.from({ length: this.mmuMachineUnit.numGates }, (v, k) => k + this.mmuMachineUnit.firstGate)
   }
 
-  get spoolWidth (): number {
-    if (this.numGates <= 8) {
-      return 56
-    } else if (this.numGates <= 16) {
-      return 48
-    }
-    return 40
+  get clipHeight (): number {
+    return Math.trunc(this.spoolWidth * 1.6)
   }
 
-  get logoRowWidth (): number {
-    return this.spoolWidth * (this.unitGateRange.length + (this.showBypass ? 1 : 0))
-  }
+  get showBypass () {
+    console.info(`PAUL: showByPass() hideBypass=${this.hideBypass}, unitIndex=${this.unitIndex}`)
+    if (this.hideBypass) return false
+    if (this.unitIndex < 0) return true
 
-  get clipSpoolClass (): string[] {
-    const classes = ['clip-spool']
-    if (this.numGates <= 8) {
-      classes.push('clip-large')
-    } else if (this.numGates <= 16) {
-      classes.push('clip-medium')
-    } else {
-      classes.push('clip-small')
-    }
-    return classes
-  }
-
-  get logoHeight (): number {
-    return this.spoolWidth - 8
-  }
-
-  get showName (): boolean {
-    return this.$typedState.config.uiSettings.mmu.showName
-  }
-
-  get showLogos (): boolean {
-    return this.$typedState.config.uiSettings.mmu.showLogos
-  }
-
-  get showBypass (): boolean {
-    return !this.editGateMap && this.unitDetails(this.unitIndex).hasBypass && this.hasBypass
+    return this.mmuMachineUnit.hasBypass
   }
 
   gateTooltip (gate: number): string[] {
@@ -390,13 +316,14 @@ export default class MmuUnit extends Mixins(BrowserMixin, StateMixin, MmuMixin) 
     return ret
   }
 
-  gateStatusClass (gate: number): string[] {
-    const firstGate = gate === 0
-    const lastGate = (gate === this.unitGateRange.length - 1 && !this.showBypass) || gate === this.TOOL_GATE_BYPASS
+  gateStatusClass (index: number): string[] {
+    const firstGate = (this.unitIndex < 0 || index === 0)
+    const lastGate = (index === this.unitGateRange.length - 1 && !this.showBypass) || index === this.TOOL_GATE_BYPASS
     const classes = ['gate-status-row']
     if (firstGate) classes.push('first-gate')
     if (lastGate) classes.push('last-gate')
     classes.push(this.$vuetify.theme.dark ? 'gate-status-row-dark-theme' : 'gate-status-row-light-theme')
+    console.info(`PAUL: classes=${classes}`)
     return classes
   }
 
@@ -427,6 +354,12 @@ export default class MmuUnit extends Mixins(BrowserMixin, StateMixin, MmuMixin) 
     } else if (!this.isPrinting) {
       this.sendGcode('MMU_SELECT BYPASS=1')
     }
+  }
+
+  get footerStyle () {
+    const numSpools = this.mmuMachineUnit.numGates + (this.showBypass ? 1 : 0)
+    const maxWidth = this.spoolWidth * numSpools + 32
+    return { maxWidth: `${maxWidth}px` }
   }
 
   // Gate context menu handling...
@@ -529,89 +462,40 @@ export default class MmuUnit extends Mixins(BrowserMixin, StateMixin, MmuMixin) 
 }
 
 .gate-status-row {
+    box-shadow: inset 0px 4px 4px -4px #ffffff80;
     padding-top: 2px;
     padding-bottom: 2px;
     position: relative;
     z-index: 1;
 }
 
-.logo-row {
-    display: flex;
-}
-
-.mmu-logo {
-    padding: 4px 12px 8px 0px;
-    fill: currentColor;
-    stroke: currentColor;
-    opacity: 0.7;
-}
-
-.unit-info {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    width: 100%;
-}
-
-.unit-name {
-    display: flex;
-    align-items: flex-end;
-    font-size: 12px;
-    white-space: nowrap;
-    overflow: hidden;
-    padding: 8px 0 0 0;
-}
-
-.unit-climate {
-    font-size: 10px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-align: right;
-    padding: 0px;
-    opacity: 0.8;
-}
-
 .gate-status-row-dark-theme {
-    box-shadow: inset 0px 4px 4px -4px #ffffff80;
     background-image: linear-gradient(to bottom, #3c3c3c 0%, #2c2c2c 100%);
 }
 
 .gate-status-row-light-theme {
-    box-shadow: inset 0px 4px 4px -4px #ffffff80;
     background-image: linear-gradient(to bottom, #d0d0d0 0%, #f0f0f0ff 100%);
 }
 
 .first-gate {
-    border-radius: 8px 0 0px 10px;
+    border-radius: 8px 0 0 0;
     margin-left: -16px;
     padding-left: 16px;
 }
 
 .last-gate {
-    border-radius: 0 8px 10px 0px;
+    border-radius: 0 8px 0 0;
     margin-right: -16px;
     padding-right: 16px;
 }
 
 .first-gate.last-gate {
-    border-radius: 8px 8px 10px 10px;
+    border-radius: 8px 8px 0 0;
 }
 
 .clip-spool {
     position: relative;
     margin-top: 8px;
-}
-
-.clip-small {
-    max-height: 73px;
-}
-
-.clip-medium {
-    max-height: 88px;
-}
-
-.clip-large {
-    max-height: 100px;
 }
 
 .gate {

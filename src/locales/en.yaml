@@ -1161,6 +1161,11 @@ app:
       spoolman_today: Today
       spoolman_yesterday: Yesterday
       spoolman_days_ago: '%{days} days ago'
+      drying: Drying
+      heater: Heater
+      drying_queued: Drying queued
+      drying_complete: Drying complete
+      drying_cancelled: Drying cancelled
     tooltip:
       empty: Empty
       color: Color
@@ -1213,6 +1218,7 @@ app:
       show_ttg_map: Show TTG Map
       show_name: Show Unit Name
       show_logos: Show Logos
+      show_climate: Show Climate Info
       show_unavailable_spool_color: Show Unavailable Spools
   sensors:
     title:
