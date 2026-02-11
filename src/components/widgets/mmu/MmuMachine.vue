@@ -15,6 +15,7 @@
             :show-details="showDetails"
             :hide-bypass="hideBypass"
             @select-gate="selectGate"
+            @edit-filament="editFilament"
           />
         </div>
       </v-col>
@@ -31,7 +32,6 @@
             :show-details="false"
             :show-footer="false"
             @select-gate="selectGate"
-            @edit-filament="editFilament"
           />
         </div>
       </v-col>
