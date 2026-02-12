@@ -28,7 +28,7 @@
           <mmu-unit
             :unit-index="-1"
             :edit-gate-map="false"
-            :show-context-menu="false"
+            :show-context-menu="showContextMenu"
             :show-details="false"
             :show-footer="false"
             @select-gate="selectGate"

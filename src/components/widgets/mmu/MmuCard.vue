@@ -162,7 +162,7 @@
         pa-2
       >
         <v-row align="start">
-          <mmu-machine @edit-filament="editFilament" />
+          <mmu-machine @select-gate="selectGate" @edit-filament="editFilament" />
         </v-row>
         <v-row align="start">
           <v-col
@@ -353,6 +353,15 @@ export default class MmuCard extends Mixins(StateMixin, MmuMixin) {
   openEditGateMapDialog (gate?: number | null) {
     this.initialEditGate = typeof gate === 'number' ? gate : null
     this.showEditGateMapDialog = true
+  }
+
+  private selectGate(gate: number) {
+    if (gate === this.TOOL_GATE_BYPASS) {
+      this.sendGcode('MMU_SELECT BYPASS=1', 'mmu_select')
+      return
+    }
+
+    this.sendGcode(`MMU_SELECT GATE=${gate}`, 'mmu_select')
   }
 
   private editFilament (gate: number) {

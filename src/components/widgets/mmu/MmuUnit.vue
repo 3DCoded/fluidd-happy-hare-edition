@@ -2,11 +2,12 @@
   <v-container class="unit-container">
     <div class="spool-row">
       <div
-        v-for="(g, index) in unitGateRange"
+        v-for="(g, index) in displayGates"
         :key="`gate_${g}`"
         class="gate"
-        @contextmenu.prevent="openContextMenu(g, $event)"
-        @click="selectGate(g)"
+        cursor-pointer
+        @click="handleClickGate(g, $event)"
+        @contextmenu.prevent
       >
         <div
           class="clip-spool"
@@ -26,7 +27,7 @@
               <v-tooltip
                 top
                 :open-delay="500"
-                :disabled="editGateMap != null && editGateMap.length > 0"
+                :disabled="!showDetails"
                 content-class="spool-tooltip"
               >
                 <template #activator="{ on: tooltipOn, attrs: tooltipAttrs }">
@@ -43,15 +44,15 @@
                     />
                   </div>
                 </template>
-                <div
-                  v-for="(line, idx) in gateTooltip(g)"
-                  :key="idx"
-                  class="spool-tooltip-line"
-                  :class="{
-                    'spool-tooltip-title': idx === 0
-                  }"
-                >
-                  {{ line }}
+
+                <div class="spool-tooltip">
+                  <div
+                    v-if="tooltipTitle(g)"
+                    class="d-block font-weight-bold"
+                  >
+                    {{ tooltipTitle(g) }}
+                  </div>
+                  <div>{{ tooltipText(g) }}</div>
                 </div>
               </v-tooltip>
             </template>
@@ -60,18 +61,18 @@
               dense
               @mouseleave="closeContextMenu"
             >
-              <v-subheader class="compact-subheader">
-                Gate {{ g }}
+              <v-subheader class="compact-subheader d-block text-subtitle-2 text-center mb-0 h-auto pb-2">
+                {{ contextMenuHeader(g) }}
               </v-subheader>
               <v-divider />
               <v-list-item
-                v-for="(item, i) in contextMenuItems"
+                v-for="(item, i) in contextMenuItems(g)"
                 :key="i"
               >
                 <v-btn
                   small
                   style="width: 100%"
-                  :disabled="!klippyReady || isItemDisabled(item, g)"
+                  :disabled="isItemDisabled(item, g)"
                   :loading="hasWait(item.loading)"
                   @click="runMenuItem(item, g)"
                 >
@@ -83,8 +84,9 @@
               </v-list-item>
             </v-list>
           </v-menu>
+
           <div
-            v-if="(editGateMap && editGateSelected === g) || (!editGateMap && gate === g)"
+            v-if="isSelectedGate(g)"
             style="position: absolute; bottom: 0%; left: 0%; width: 100%; height: auto; background: none;"
           >
             <svg
@@ -130,81 +132,10 @@
             </svg>
           </div>
         </div>
+
         <mmu-gate-status
           :class="gateStatusClass(index)"
           :gate-index="g"
-          :edit-gate-map="editGateMap"
-          :edit-gate-selected="editGateSelected"
-        />
-      </div>
-
-      <div
-        v-if="showBypass"
-        class="gate"
-        @contextmenu.prevent="openContextMenu(-2, $event)"
-        @click="selectBypass()"
-      >
-        <div
-          class="clip-spool"
-          :style="{ 'max-height': `${clipHeight}px` }"
-        >
-          <mmu-spool
-            :width="$filters.getPixelsString(spoolWidth)"
-            :class="spoolClass(TOOL_GATE_BYPASS)"
-            :gate-index="TOOL_GATE_BYPASS"
-            :edit-gate-map="editGateMap"
-            :edit-gate-selected="editGateSelected"
-          />
-          <div
-            v-if="gate === TOOL_GATE_BYPASS"
-            style="position: absolute; bottom: 0%; left: 0%; width: 100%; height: auto; background: none;"
-          >
-            <svg
-              width="100%"
-              height="100%"
-              viewBox="0 0 80 60"
-            >
-              <defs>
-                <clipPath id="clip-half">
-                  <rect
-                    x="0"
-                    y="0"
-                    width="80"
-                    height="60"
-                  />
-                </clipPath>
-                <radialGradient
-                  id="spotlight"
-                  cx="50%"
-                  cy="70%"
-                  r="50%"
-                  fx="50%"
-                  fy="100%"
-                >
-                  <stop
-                    offset="0%"
-                    style="stop-color:rgba(255, 255, 255, 0.9); stop-opacity:1"
-                  />
-                  <stop
-                    offset="100%"
-                    style="stop-color:rgba(255, 255, 0, 0); stop-opacity:0"
-                  />
-                </radialGradient>
-              </defs>
-              <rect
-                x="0"
-                y="0"
-                width="100%"
-                height="100%"
-                fill="url(#spotlight)"
-                clip-path="url(#clip-half)"
-              />
-            </svg>
-          </div>
-        </div>
-        <mmu-gate-status
-          :class="gateStatusClass(TOOL_GATE_BYPASS)"
-          :gate-index="TOOL_GATE_BYPASS"
           :edit-gate-map="editGateMap"
           :edit-gate-selected="editGateSelected"
         />
@@ -288,6 +219,15 @@ export default class MmuUnit extends Mixins(BrowserMixin, StateMixin, MmuMixin) 
     return Array.from({ length: this.mmuMachineUnit.numGates }, (v, k) => k + this.mmuMachineUnit.firstGate)
   }
 
+  get displayGates (): number[] {
+    const gates = this.unitGateRange
+    return this.showBypass ? [...gates, this.TOOL_GATE_BYPASS] : gates
+  }
+
+  isSelectedGate (g: number): boolean {
+    return (this.editGateMap && this.editGateSelected === g) || (!this.editGateMap && this.gate === g)
+  }
+
   get clipHeight (): number {
     return Math.trunc(this.spoolWidth * 1.6)
   }
@@ -299,23 +239,33 @@ export default class MmuUnit extends Mixins(BrowserMixin, StateMixin, MmuMixin) 
     return this.mmuMachineUnit.hasBypass
   }
 
-  gateTooltip (gate: number): string[] {
+  contextMenuHeader (gate: number): string {
+    if (gate >= 0) return this.$t('app.mmu.label.gate') + ' ' + gate
+    return 'Bypass'
+  }
+
+  tooltipTitle (gate: number): string | null {
+    const details = this.gateDetails(gate)
+    if (details.status === this.GATE_EMPTY) return null
+
+    return details.filamentName
+  }
+
+  tooltipText (gate: number): string {
     const details = this.gateDetails(gate)
     if (details.status === this.GATE_EMPTY) {
-      return [this.$t('app.mmu.tooltip.empty').toString()]
+      return this.$t('app.mmu.tooltip.empty').toString()
     }
-    const ret = []
-
-    ret.push(details.filamentName)
+    const output = []
 
     const tempStr = details.temperature > 0
       ? ` | ${details.temperature}°C`
       : ''
-    ret.push(details.material + tempStr)
+    output.push(details.material + tempStr)
 
     if (details.color && details.color !== '#808182E3') {
       const color = details.color
-      ret.push(
+      output.push(
         this.$t('app.mmu.tooltip.color').toString() +
                     ': ' +
                     color.substring(0, 7) +
@@ -324,15 +274,16 @@ export default class MmuUnit extends Mixins(BrowserMixin, StateMixin, MmuMixin) 
     }
 
     if (details.spoolId && details.spoolId > 0) {
-      ret.push(this.$t('app.mmu.tooltip.spoolid').toString() + ': ' + details.spoolId)
+      output.push(this.$t('app.mmu.tooltip.spoolid').toString() + ': ' + details.spoolId)
     }
 
-    return ret
+    return output.join('\n')
   }
 
   gateStatusClass (index: number): string[] {
     const firstGate = (this.unitIndex < 0 || index === 0)
-    const lastGate = (index === this.unitGateRange.length - 1 && !this.showBypass) || index === this.TOOL_GATE_BYPASS
+    const lastGate = index === (this.displayGates.length - 1)
+
     const classes = ['gate-status-row']
     if (firstGate) classes.push('first-gate')
     if (lastGate) classes.push('last-gate')
@@ -351,22 +302,6 @@ export default class MmuUnit extends Mixins(BrowserMixin, StateMixin, MmuMixin) 
       }
     }
     return classes
-  }
-
-  selectGate (gate: number) {
-    if (this.editGateMap) {
-      this.$emit('select-gate', gate)
-    } else if (!this.isPrinting) {
-      this.sendGcode('MMU_SELECT GATE=' + gate)
-    }
-  }
-
-  selectBypass () {
-    if (this.editGateMap) {
-      this.$emit('select-gate', this.TOOL_GATE_BYPASS)
-    } else if (!this.isPrinting) {
-      this.sendGcode('MMU_SELECT BYPASS=1')
-    }
   }
 
   get footerStyle () {
@@ -395,35 +330,47 @@ export default class MmuUnit extends Mixins(BrowserMixin, StateMixin, MmuMixin) 
     }
   }
 
-  get contextMenuItems (): ContextMenuItem[] {
-    return [
-      {
-        icon: '$mmuEditGateMap',
-        label: this.$t('app.mmu.btn.edit_gate_map').toString(),
-        loading: this.$waits.onMmuChangeTool,
-        action: { kind: 'call', fn: (gate) => this.editFilament(gate) },
-        disabled: () => false,
-      },
+  contextMenuItems (gate: number): ContextMenuItem[] {
+      const items = this.allContextMenuItems
+      if (gate < 0) return items.slice(0, 1)
+      return items
+  }
+
+  get allContextMenuItems (): ContextMenuItem[] {
+    const isLoaded = this.filamentPos === this.FILAMENT_POS_LOADED
+    const canCrossload = this.unitDetails(this.unitIndex).canCrossload
+
+    const items: ContextMenuItem[] = [
       {
         icon: '$mmuSelectGate',
         label: this.$t('app.mmu.btn.select').toString(),
-        loading: this.$waits.onMmuSelect,
-        action: { kind: 'gcode', command: 'MMU_SELECT' },
-        disabled: (gate) => !this.canSend || gate === this.gate || this.isPrinting || this.filamentPos === this.FILAMENT_POS_LOADED,
+        loading: '',
+        action: { kind: 'call', fn: (gate) => this.selectGate(gate) },
+        disabled: (gate) => !this.canSend || gate === this.gate || this.isPrinting || isLoaded,
+      },
+      {
+        icon: '$mmuEditGateMap',
+        label: this.$t('app.mmu.btn.edit_gate_map').toString(),
+        loading: '',
+        action: { kind: 'call', fn: (gate) => this.editFilament(gate) },
+        disabled: () => false,
       },
       {
         icon: '$mmuPreload',
         label: this.$t('app.mmu.btn.preload').toString(),
         loading: this.$waits.onMmuPreload,
         action: { kind: 'gcode', command: 'MMU_PRELOAD' },
-        disabled: () => !this.canSend,
+        disabled: (gate) =>
+          !this.canSend ||
+            (gate === this.gate && !canCrossload) ||
+            (gate === this.gate && isLoaded),
       },
       {
         icon: '$mmuEject',
         label: this.$t('app.mmu.btn.eject').toString(),
         loading: this.$waits.onMmuEject,
         action: { kind: 'gcode', command: 'MMU_EJECT' },
-        disabled: () => !this.canSend,
+        disabled: (gate) => !this.canSend || (gate !== this.gate && !canCrossload),
       },
       {
         icon: '$mmuChangeTool',
@@ -433,20 +380,31 @@ export default class MmuUnit extends Mixins(BrowserMixin, StateMixin, MmuMixin) 
         disabled: (gate) => !this.canSend || gate === this.gate || this.isPrinting,
       },
     ]
+
+    return items
+  }
+
+  private selectGate (gate: number) {
+    this.$emit('select-gate', gate)
   }
 
   private editFilament (gate: number) {
     this.$emit('edit-filament', gate)
   }
 
+  handleClickGate (gate: number, e: MouseEvent) {
+    if (this.showContextMenu) return this.openContextMenu(gate, e)
+    this.selectGate(gate)
+  }
+
   openContextMenu (gate: number, e: MouseEvent) {
-    if (gate < 0 || !this.showContextMenu) {
-      this.closeContextMenu()
-      return
-    }
+    e.preventDefault()
+
     this.menuX = e.clientX - 20
     this.menuY = e.clientY - 20
+
     this.closeContextMenu()
+
     this.$set(this.gateMenuVisible, gate, true)
     this.closeTimeout = window.setTimeout(() => {
       this.closeContextMenu()
@@ -480,16 +438,6 @@ export default class MmuUnit extends Mixins(BrowserMixin, StateMixin, MmuMixin) 
 .spool-tooltip {
     max-width: 180px;
     font-size: 12px;
-    line-height: 1.2em;
-    padding: 4px 8px;
-}
-
-.spool-tooltip-title {
-    font-weight: bold;
-}
-
-.spool-tooltip-line {
-    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
