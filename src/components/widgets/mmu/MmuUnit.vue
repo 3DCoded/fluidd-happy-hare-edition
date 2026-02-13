@@ -5,7 +5,7 @@
         v-for="(g, index) in displayGates"
         :key="`gate_${g}`"
         class="gate"
-        cursor-pointer
+        :class="{ 'gate--menu': showContextMenu }"
         @click="handleClickGate(g, $event)"
         @contextmenu.prevent
       >
@@ -145,7 +145,6 @@
     <mmu-unit-footer
       class="pt-0 position-relative"
       :style="footerStyle"
-      :mmu-machine-unit="mmuMachineUnit"
       :show-details="showDetails"
       :show-footer="showFooter"
       :unit-index="unitIndex"
@@ -493,6 +492,10 @@ export default class MmuUnit extends Mixins(BrowserMixin, StateMixin, MmuMixin) 
     border-radius: 12px;
     line-height: 1em;
     cursor: pointer;
+}
+
+.gate--menu {
+    cursor: context-menu;
 }
 
 .highlight-spool {
